@@ -17,6 +17,7 @@ module.exports = function(compiler, options) {
 		console.warn("options.watchDelay is deprecated: Use 'options.watchOptions.aggregateTimeout' instead");
 		options.watchOptions.aggregateTimeout = options.watchDelay;
 	}
+	if(typeof options.charsetOverrides === "undefined") options.charsetOverrides = {};
 	if(typeof options.watchOptions.aggregateTimeout === "undefined") options.watchOptions.aggregateTimeout = 200;
 	if(typeof options.stats === "undefined") options.stats = {};
 	if(!options.stats.context) options.stats.context = process.cwd();
@@ -170,6 +171,20 @@ module.exports = function(compiler, options) {
 		return content;
 	}
 
+	// Returns the appropriate value for the Content-Type header for the given
+	// filename including charset (if options.charsetOverrides is present)
+	function getContentType(filename, options) {
+		var contentType = mime.lookup(filename);
+		var charsetOverrides = options.charsetOverrides;
+
+		// XXX: Would be nicer if charsetOverrides keys could also be regexps
+		if (charsetOverrides[contentType]) {
+			contentType += "; charset=" + charsetOverrides[contentType];
+		}
+
+		return contentType;
+	}
+
 	// The middleware function
 	function webpackDevMiddleware(req, res, next) {
 		var filename = getFilenameFromUrl(req.url);
@@ -209,7 +224,7 @@ module.exports = function(compiler, options) {
 			var content = fs.readFileSync(filename);
 			content = handleRangeHeaders(content, req, res);
 			res.setHeader("Access-Control-Allow-Origin", "*"); // To support XHR, etc.
-			res.setHeader("Content-Type", mime.lookup(filename));
+			res.setHeader("Content-Type", getContentType(filename, options));
 			res.setHeader("Content-Length", content.length);
 			if(options.headers) {
 				for(var name in options.headers) {
